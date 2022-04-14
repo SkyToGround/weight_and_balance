@@ -342,13 +342,12 @@ def get_int_setting(config: ConfigParser, config_name: str, description: str, de
 def main():
     config = ConfigParser()
     pilot_mass = get_float_setting(config, "pilot_mass", "Pilot mass [kg]", 90)
-    max_fuel_mass_liter = get_float_setting(config, "max_fuel", "Max fuel [ℓ]", 300)
+    max_fuel_mass_liter = get_float_setting(config, "max_fuel", "Max fuel [ℓ]", 675)
     max_fuel_mass = max_fuel_mass_liter * jeta1_density
     jumpers = get_int_setting(config, "nr_of_skydivers", "Nr of skydivers", 14)
     jumper_total_mass = get_float_setting(config, "jumper_mass", "Skydiver total mass [kg]", jumpers*85)
     jumper_min_mass = get_float_setting(config, "jumper_min_mass", "Skydiver min. mass [kg]", 70)
     jumper_max_mass = get_float_setting(config, "jumper_max_mass", "Skydiver max. mass [kg]", 95)
-    # exit(0)
     right = -42.0
     left = 42.0
     center = 0.0
@@ -379,7 +378,7 @@ def main():
         Seat(339 * inch, 5, -95.0),
     ]
     wb_limits = WBLine([WBPoint(4500*pound, 179.6*inch), WBPoint(5500*pound, 179.6*inch), WBPoint(8000*pound, 193.37*inch), WBPoint(8750*pound, 199.15*inch), WBPoint(9062*pound, 200.23*inch), WBPoint(9062*pound, 204.35*inch), WBPoint(4500*pound, 204.35*inch)])
-    lsk = Aircraft(empty_wb=WBPoint(2050.0, 183.7*inch), pilot_arm=135.5*inch, fuel_tank=FuelLoad(max_mass=2224*pound, arm=203.3*inch), limits=wb_limits)
+    lsk = Aircraft(empty_wb=WBPoint(2050.0, 468.5), pilot_arm=135.5*inch, fuel_tank=FuelLoad(max_mass=2224*pound, arm=203.3*inch), limits=wb_limits)
     lsk.set_pilot_mass(pilot_mass)
     no_fuel_no_passenger_mass = lsk.no_fuel_mass
     pilot_wb_point = lsk.get_weight_and_balance()
@@ -505,6 +504,7 @@ def main():
     weight_landing_limits = np.array([8500, 8500]) * pound
     ax.plot(arm_landing_limits, weight_landing_limits, "--", color="k")
     ax.axis([440, None, None, None])
+    ax.grid()
     ax.plot(pilot_wb_point.arm, pilot_wb_point.mass, "X", label="Pilot(s)", c="k")
     fuel_wb_line.plot_line(ax, "Fuel")
     exit_mass, exit_arms = best_wb_points.get_wb_line()
@@ -560,7 +560,7 @@ def main():
     ax_seats.yaxis.set_ticks([])
     ax_seats.xaxis.set_ticklabels([])
     ax_seats.yaxis.set_ticklabels([])
-    ax_seats.set_title("Seats in use and exit positions (with priority)")
+    ax_seats.set_title("Seats in use and exit positions")
 
     ax_extra = fig.add_subplot(gs[13:, :])
     ax_extra.xaxis.set_ticks([])
