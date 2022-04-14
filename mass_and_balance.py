@@ -323,7 +323,7 @@ def calc_exit_cb_point(plane: Aircraft, seats_balance: Balance, exit_balance: Ba
 def get_setting(config: ConfigParser, config_name: str, description: str, numeric_type: type, default: Optional[int] = None):
     while True:
         try:
-            print(f"{description:>25s} ({default:4.0f}):")
+            print(f"{description:>25s} ({default:4.0f}):", end='')
             new_value = input()
             if new_value == "" and default is not None:
                 break
@@ -345,7 +345,7 @@ def main():
     max_fuel_mass_liter = get_float_setting(config, "max_fuel", "Max fuel [ℓ]", 675)
     max_fuel_mass = max_fuel_mass_liter * jeta1_density
     jumpers = get_int_setting(config, "nr_of_skydivers", "Nr of skydivers", 14)
-    jumper_total_mass = get_float_setting(config, "jumper_mass", "Skydiver total mass [kg]", jumpers*85)
+    jumper_total_mass = get_float_setting(config, "jumper_mass", "Skydiver total mass [kg]", jumpers*90)
     jumper_min_mass = get_float_setting(config, "jumper_min_mass", "Skydiver min. mass [kg]", 70)
     jumper_max_mass = get_float_setting(config, "jumper_max_mass", "Skydiver max. mass [kg]", 95)
     right = -42.0
@@ -584,6 +584,7 @@ def main():
     def on_click(event):
         if platform == "win32":
             print("Printing on Windows")
+            subprocess.call(["mspaint", "/pt", file_name])
         elif platform == "darwin":
             print("Printing on Mac OS")
             subprocess.call(["lpr", file_name])
