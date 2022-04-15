@@ -320,7 +320,15 @@ def calc_exit_cb_point(plane: Aircraft, seats_balance: Balance, exit_balance: Ba
     c_wb = plane.get_weight_and_balance()
     return c_wb, plane.within_limits(c_wb)
 
+
 def get_setting(config: ConfigParser, config_name: str, description: str, numeric_type: type, default: Optional[int] = None):
+    config_section = "WeightAndBalance"
+    if config_section not in config:
+        config.add_section(config_section)
+    if config_name not in config[config_section]:
+        config[config_section][config_name] = f"{default}"
+    default = numeric_type(config[config_section][config_name])
+    new_value = ""
     while True:
         try:
             print(f"{description:>30s} ({default:4.0f}):", end='')
@@ -331,6 +339,7 @@ def get_setting(config: ConfigParser, config_name: str, description: str, numeri
         except ValueError as e:
             print(f"The input \"{new_value}\" can not be converted to a number. The error was: {e}")
         break
+    config[config_section][config_name] = f"{default}"
     return default
 
 def get_float_setting(config: ConfigParser, config_name: str, description: str, default: Optional[int] = None):
@@ -339,18 +348,9 @@ def get_float_setting(config: ConfigParser, config_name: str, description: str, 
 def get_int_setting(config: ConfigParser, config_name: str, description: str, default: Optional[int] = None):
     return get_setting(config, config_name, description, int, default)
 
-def main():
-    config = ConfigParser()
-    pilot_mass = get_float_setting(config, "pilot_mass", "Pilot mass [kg]", 185)
-    max_fuel_mass_liter = get_float_setting(config, "max_fuel", "Max fuel [ℓ]", 1200)
-    max_fuel_mass = max_fuel_mass_liter * jeta1_density
-    jumpers = get_int_setting(config, "nr_of_skydivers", "Nr of skydivers", 13)
-    jumper_total_mass = get_float_setting(config, "jumper_mass", "Skydiver total mass (w. gear) [kg]", jumpers*92)
-    jumper_min_mass = get_float_setting(config, "jumper_min_mass", "Skydiver min. mass (w/o gear) [kg]", 65)
-    jumper_max_mass = get_float_setting(config, "jumper_max_mass", "Skydiver max. mass (w/o gear) [kg]", 112)
+def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int, jumper_total_weight: float, jumper_min_weight: float, jumper_max_weight: float):
     right = -42.0
     left = 42.0
-    center = 0.0
     origin = 422.0
     offset = 44.0
     seats = [Seat(origin + offset * 0, 1, right),
@@ -380,12 +380,17 @@ def main():
         Seat(319.5 * inch, 4, -50),
         Seat(339 * inch, 5, -95.0),
     ]
-    wb_limits = WBLine([WBPoint(4500*pound, 179.6*inch), WBPoint(5500*pound, 179.6*inch), WBPoint(8000*pound, 193.37*inch), WBPoint(8750*pound, 199.15*inch), WBPoint(9062*pound, 200.23*inch), WBPoint(9062*pound, 204.35*inch), WBPoint(4500*pound, 204.35*inch)])
-    lsk = Aircraft(empty_wb=WBPoint(2050.0, 468.5), pilot_arm=135.5*inch, fuel_tank=FuelLoad(max_mass=2224*pound, arm=203.3*inch), limits=wb_limits)
-    lsk.set_pilot_mass(pilot_mass)
+    wb_limits = WBLine(
+        [WBPoint(4500 * pound, 179.6 * inch), WBPoint(5500 * pound, 179.6 * inch), WBPoint(8000 * pound, 193.37 * inch),
+         WBPoint(8750 * pound, 199.15 * inch), WBPoint(9062 * pound, 200.23 * inch),
+         WBPoint(9062 * pound, 204.35 * inch), WBPoint(4500 * pound, 204.35 * inch)])
+    lsk = Aircraft(empty_wb=WBPoint(2050.0, 468.5), pilot_arm=135.5 * inch,
+                   fuel_tank=FuelLoad(max_mass=2224 * pound, arm=203.3 * inch), limits=wb_limits)
+    lsk.set_pilot_mass(pilot_weight)
     no_fuel_no_passenger_mass = lsk.no_fuel_mass
     pilot_wb_point = lsk.get_weight_and_balance()
-    passengers = get_passengers(nr_of=jumpers, min_mass=jumper_min_mass + 10, max_mass=jumper_max_mass + 10, total_mass=jumper_total_mass)
+    passengers = get_passengers(nr_of=nr_of_skydivers, min_mass=jumper_min_weight + 10, max_mass=jumper_max_weight + 10,
+                                total_mass=jumper_total_weight)
     placed_passengers = place_passengers(balance=Balance.FrontHeavy, seats=seats, passengers=passengers, shifts_back=0)
     lsk.set_passengers(placed_passengers)
 
@@ -423,11 +428,10 @@ def main():
                 max_n_exit = min(len(exit_seats), len(passengers) - n_has_left)
                 max_has_exited = 0
                 for n_exit in range(1, max_n_exit + 1):
-
-                    had_to_break = False
                     for seated_balance, exit_balance in itertools.product(balance_alts, balance_alts):
                         c_wb_point, within_limits = calc_exit_cb_point(plane=lsk, seats_balance=seated_balance,
-                                                                       exit_balance=exit_balance, fuel_mass=fuel_mass_range,
+                                                                       exit_balance=exit_balance,
+                                                                       fuel_mass=fuel_mass_range,
                                                                        seats=seats, exit_seats=exit_seats,
                                                                        passengers=passengers, passenger_shift=s,
                                                                        nr_passengers_left=n_has_left,
@@ -457,12 +461,13 @@ def main():
     h_offset = 1
     h_start = 482
     param_lines = [
-        ["Maximum fuel", f"{fuel_mass_range.max():.0f} kg / {fuel_mass_range.max()/jeta1_density:.0f} ℓ / {fuel_mass_range.max()/pound:.0f} lbs"],
-        ["Pilot(s)", f"{pilot_mass:.0f} kg"],
-        ["# of skydivers", f"{jumpers}"],
-        ["Skydivers total (w. gear)", f"{jumper_total_mass:.0f} kg"],
-        ["Skydivers min (w/o gear)", f"{jumper_min_mass:.0f} kg"],
-        ["Skydivers max (w/o gear)", f"{jumper_max_mass:.0f} kg"]
+        ["Maximum fuel",
+         f"{fuel_mass_range.max():.0f} kg / {fuel_mass_range.max() / jeta1_density:.0f} ℓ / {fuel_mass_range.max() / pound:.0f} lbs"],
+        ["Pilot(s)", f"{pilot_weight:.0f} kg"],
+        ["# of skydivers", f"{nr_of_skydivers}"],
+        ["Skydivers total (w. gear)", f"{jumper_total_weight:.0f} kg"],
+        ["Skydivers min (w/o gear)", f"{jumper_min_weight:.0f} kg"],
+        ["Skydivers max (w/o gear)", f"{jumper_max_weight:.0f} kg"]
     ]
     ax.text(h_start, v_start + v_offset, "Input parameters", ha="center", va="bottom", weight="bold")
     for i, param in enumerate(param_lines):
@@ -510,12 +515,13 @@ def main():
     points = np.stack((exit_mass, exit_arms), axis=1)
     hull = ConvexHull(points)
     # ax.plot(points[hull.vertices,1], points[hull.vertices,0], "--", lw=2)
-    ax.fill(points[hull.vertices,1], points[hull.vertices,0], label="Exit W&B", c="#ff7f0e")
+    ax.fill(points[hull.vertices, 1], points[hull.vertices, 0], label="Exit W&B", c="#ff7f0e")
 
     seated_mass, seated_arm = best_seated_wb_points.get_wb_line()
     seated_points = np.stack((seated_arm, seated_mass), axis=1)
     seated_hull = ConvexHull(seated_points)
-    ax.fill(seated_points[seated_hull.vertices, 0], seated_points[seated_hull.vertices, 1], label="Seated W&B (TO)", c="#1f77b4")
+    ax.fill(seated_points[seated_hull.vertices, 0], seated_points[seated_hull.vertices, 1], label="Seated W&B (TO)",
+            c="#1f77b4")
     # shaper = Alpha_Shaper(seated_points)
     # alpha_shape = shaper.get_shape(alpha=0.2)
     # ax.add_patch(PolygonPatch(alpha_shape, color='#1f77b4'))
@@ -539,14 +545,14 @@ def main():
         circle = pl.Circle((c_seat.arm, c_seat.lateral_pos), 15.5, color='k', fill=False)
         ax_seats.add_patch(circle)
         ax_seats.text(c_seat.arm, c_seat.lateral_pos, f"{c_seat.seat_nr}", ha="center",
-                     va="center")
+                      va="center")
         if c_seat.seat_nr not in c_used_seats:
             no_place_lines_1 = np.array([-1, 1]) * 18
             no_place_lines_2 = np.array([1, -1]) * 18
             ax_seats.plot(no_place_lines_1 + c_seat.arm, no_place_lines_1 + c_seat.lateral_pos,
-                         "-", color="k")
+                          "-", color="k")
             ax_seats.plot(no_place_lines_1 + c_seat.arm, no_place_lines_2 + c_seat.lateral_pos,
-                         "-", color="k")
+                          "-", color="k")
 
     for c_exit in exit_seats:
         circle = pl.Circle((c_exit.arm, c_exit.lateral_pos), 15.5, color='k', fill=False)
@@ -565,12 +571,14 @@ def main():
     ax_extra.yaxis.set_ticks([])
     ax_extra.xaxis.set_ticklabels([])
     ax_extra.yaxis.set_ticklabels([])
-    ax_extra.text(0.01, 0, "ALWAYS remain at your assigned seat until the previous group has exited.", ha="left", va="bottom")
+    ax_extra.text(0.01, 0, "ALWAYS remain at your assigned seat until the previous group has exited.", ha="left",
+                  va="bottom")
     ax_extra.axis([0, None, 0, 4])
 
     @ticker.FuncFormatter
     def major_formatter(x, pos):
         return f"{int(len(best_exit_group) - x):d}"
+
     ax_exits.xaxis.set_major_formatter(major_formatter)
     ax_exits.yaxis.set_major_locator(ticker.MultipleLocator(1))
     fig.tight_layout()
@@ -592,6 +600,28 @@ def main():
     bcut = Button(axcut, 'Print', color='red', hovercolor='green')
     bcut.on_clicked(on_click)
     pl.show()
+
+def main():
+    config_file_name = "config.ini"
+    config = ConfigParser()
+    config.read(config_file_name)
+    while True:
+        try:
+            pilot_mass = get_float_setting(config, "pilot_mass", "Pilot mass [kg]", 185)
+            max_fuel_mass_liter = get_float_setting(config, "max_fuel", "Max fuel [ℓ]", 1200)
+            max_fuel_mass = max_fuel_mass_liter * jeta1_density
+            jumpers = get_int_setting(config, "nr_of_skydivers", "Nr of skydivers", 13)
+            jumper_total_mass = get_float_setting(config, "jumper_mass", "Skydiver total mass (w. gear) [kg]", jumpers*92)
+            jumper_min_mass = get_float_setting(config, "jumper_min_mass", "Skydiver min. mass (w/o gear) [kg]", 65)
+            jumper_max_mass = get_float_setting(config, "jumper_max_mass", "Skydiver max. mass (w/o gear) [kg]", 112)
+
+            calc_w_and_b(pilot_mass, max_fuel_mass, jumpers, jumper_total_mass, jumper_min_mass, jumper_max_mass)
+            break
+        except Exception:
+            print("Failed to find solution. Try again.")
+    config_out_file = open(config_file_name, "w")
+    config.write(fp=config_out_file)
+
 
 if __name__ == "__main__":
     main()
