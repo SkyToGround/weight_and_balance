@@ -323,7 +323,7 @@ def calc_exit_cb_point(plane: Aircraft, seats_balance: Balance, exit_balance: Ba
 def get_setting(config: ConfigParser, config_name: str, description: str, numeric_type: type, default: Optional[int] = None):
     while True:
         try:
-            print(f"{description:>25s} ({default:4.0f}):", end='')
+            print(f"{description:>30s} ({default:4.0f}):", end='')
             new_value = input()
             if new_value == "" and default is not None:
                 break
@@ -341,17 +341,17 @@ def get_int_setting(config: ConfigParser, config_name: str, description: str, de
 
 def main():
     config = ConfigParser()
-    pilot_mass = get_float_setting(config, "pilot_mass", "Pilot mass [kg]", 90)
-    max_fuel_mass_liter = get_float_setting(config, "max_fuel", "Max fuel [ℓ]", 675)
+    pilot_mass = get_float_setting(config, "pilot_mass", "Pilot mass [kg]", 185)
+    max_fuel_mass_liter = get_float_setting(config, "max_fuel", "Max fuel [ℓ]", 1200)
     max_fuel_mass = max_fuel_mass_liter * jeta1_density
-    jumpers = get_int_setting(config, "nr_of_skydivers", "Nr of skydivers", 14)
-    jumper_total_mass = get_float_setting(config, "jumper_mass", "Skydiver total mass [kg]", jumpers*90)
-    jumper_min_mass = get_float_setting(config, "jumper_min_mass", "Skydiver min. mass [kg]", 70)
-    jumper_max_mass = get_float_setting(config, "jumper_max_mass", "Skydiver max. mass [kg]", 95)
+    jumpers = get_int_setting(config, "nr_of_skydivers", "Nr of skydivers", 13)
+    jumper_total_mass = get_float_setting(config, "jumper_mass", "Skydiver total mass (w. gear) [kg]", jumpers*92)
+    jumper_min_mass = get_float_setting(config, "jumper_min_mass", "Skydiver min. mass (w/o gear) [kg]", 65)
+    jumper_max_mass = get_float_setting(config, "jumper_max_mass", "Skydiver max. mass (w/o gear) [kg]", 112)
     right = -42.0
     left = 42.0
     center = 0.0
-    origin = 408.0
+    origin = 422.0
     offset = 44.0
     seats = [Seat(origin + offset * 0, 1, right),
              Seat(origin + offset * 0, 2, left),
@@ -368,7 +368,10 @@ def main():
              Seat(origin + offset * 6, 13, right),
              Seat(origin + offset * 6, 14, left),
              Seat(origin + offset * 7, 15, right),
-             Seat(origin + offset * 7, 16, left),]
+             Seat(origin + offset * 7, 16, left),
+             Seat(origin + offset * 8, 17, right),
+             Seat(origin + offset * 8, 18, left),
+             ]
     exit_seats = [
         Seat(265 * inch, 6, -110),
         Seat(294.5 * inch, 1, -100),
@@ -382,7 +385,7 @@ def main():
     lsk.set_pilot_mass(pilot_mass)
     no_fuel_no_passenger_mass = lsk.no_fuel_mass
     pilot_wb_point = lsk.get_weight_and_balance()
-    passengers = get_passengers(nr_of=jumpers, min_mass=jumper_min_mass, max_mass=jumper_max_mass, total_mass=jumper_total_mass)
+    passengers = get_passengers(nr_of=jumpers, min_mass=jumper_min_mass + 10, max_mass=jumper_max_mass + 10, total_mass=jumper_total_mass)
     placed_passengers = place_passengers(balance=Balance.FrontHeavy, seats=seats, passengers=passengers, shifts_back=0)
     lsk.set_passengers(placed_passengers)
 
@@ -431,12 +434,7 @@ def main():
                                                                        nr_in_exit_grp=n_exit)
                         if within_limits:
                             list_of_wb_points.add_point(c_wb_point)
-                        else:
-                            had_to_break = True
-                            break
-                    if had_to_break:
-                        break
-                    max_has_exited = n_exit
+                            max_has_exited = n_exit
                 max_exit_group[n_has_left] = max_has_exited
             if max_exit_group.sum() > best_exit_group.sum():
                 best_exit_group = max_exit_group
@@ -456,15 +454,15 @@ def main():
     ax.set_xlabel("Arm (cm)")
     v_offset = 85
     v_start = 4000
-    h_offset = 2
-    h_start = 480
+    h_offset = 1
+    h_start = 482
     param_lines = [
         ["Maximum fuel", f"{fuel_mass_range.max():.0f} kg / {fuel_mass_range.max()/jeta1_density:.0f} ℓ / {fuel_mass_range.max()/pound:.0f} lbs"],
         ["Pilot(s)", f"{pilot_mass:.0f} kg"],
         ["# of skydivers", f"{jumpers}"],
-        ["Skydivers total", f"{jumper_total_mass:.0f} kg"],
-        ["Skydivers min", f"{jumper_min_mass:.0f} kg"],
-        ["Skydivers max", f"{jumper_max_mass:.0f} kg"]
+        ["Skydivers total (w. gear)", f"{jumper_total_mass:.0f} kg"],
+        ["Skydivers min (w/o gear)", f"{jumper_min_mass:.0f} kg"],
+        ["Skydivers max (w/o gear)", f"{jumper_max_mass:.0f} kg"]
     ]
     ax.text(h_start, v_start + v_offset, "Input parameters", ha="center", va="bottom", weight="bold")
     for i, param in enumerate(param_lines):
