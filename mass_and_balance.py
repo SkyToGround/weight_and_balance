@@ -450,6 +450,8 @@ def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int
             list_of_seats_used.append(passengers_to_used_seats(passengers_placed))
     usable_seats = np.unique(list_of_seats_used)
     print(f"Usable seats ({len(usable_seats)}): {usable_seats}")
+    if len(usable_seats) == 0:
+        raise RuntimeError("Unable to find a solution.")
 
     gs = gridspec.GridSpec(nrows=14, ncols=1)
     fig = pl.figure(figsize=(7, 10))
@@ -617,7 +619,7 @@ def main():
 
             calc_w_and_b(pilot_mass, max_fuel_mass, jumpers, jumper_total_mass, jumper_min_mass, jumper_max_mass)
             break
-        except Exception:
+        except RuntimeError:
             print("Failed to find solution. Try again.")
     config_out_file = open(config_file_name, "w")
     config.write(fp=config_out_file)
