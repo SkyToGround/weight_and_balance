@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {% load static %}
+    <meta charset="utf-8">
+    <title>{% block title %}SE-LSK weight and balance{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="Jonas Nilsson">
+    <link href="{% static "css/bootstrap.min.css" %}" rel="stylesheet">
+    {% block head %}
+    {% endblock %}
+
+
+  </head>
+
+  <body>
+    <div class="">
+      <h4 class="mb-3">Input parameters</h4>
+      <form class="needs-validation" novalidate>
+        <div class="row g-3">
+          <div class="col-sm-3">
+            <label for="pilot_weight" class="form-label-sm">Pilot(s) weight</label>
+            <input type="text" class="form-control-sm" id="pilot_weight" value="85" required>
+          </div>
+          
+          <div class="col-sm-3">
+          <label for="fuel_amount" class="form-label-sm">Max amount of fuel</label>
+          <div class="input-group">
+            <input type="text" class="form-control-sm" id="fuel_amount" value="300" required>
+            <select class="form-select-sm" id="fuel_unit">
+              <option>litres</option>
+              <option>lbs</option>
+              <option>gallons</option>
+              <option>kg</option>
+            </select>
+          </div>
+          </div>
+
+
+          <div class="col-sm-3">
+            <label for="skydivers" class="form-label-sm"># of skydivers</label>
+            <input type="text" class="form-control-sm" id="skydivers" value="12" required>
+          </div>
+
+          <div class="col-sm-3">
+            <label for="totalWeight" class="form-label-sm">Total jumper weight (kg)</label>
+            <input type="text" class="form-control-sm" id="totalWeight" value="1100" required>
+          </div>
+        </div>
+        
+
+        <div class="row g-3">
+          
+
+
+
+          <div class="col-sm-3">
+            <label for="maxWeight" class="form-label-sm">Max jumper weight (kg)</label>
+            <input type="text" class="form-control-sm" id="maxWeight" value="65" required>
+          </div>
+
+          <div class="col-sm-3">
+            <label for="minWeight" class="form-label-sm">Min jumper weight (kg)</label>
+            <input type="text" class="form-control-sm" id="minWeight" value="95" required>
+          </div>
+          
+          <div class="col-sm-3">
+            <label for="plot_button" class="form-label"></label><br>
+            <button id="plot_button" type="submit" class="w-50 btn btn-primary">Re-plot</button>
+          </div>
+        </div>
+        
+        <div class="row g-3">
+          <img src="w_and_b_plot/12/90/1000/65/100/300/" class="img-fluid" alt="Responsive image">
+        </div>
+    </div>
+
+    <div class="container-fluid">
+      {% block content%}
+      {% endblock %}
+    </div>
+    {% block modal %}
+    {% endblock %}
+  </body>
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+  <script>window.jQuery || document.write('<script src="../../assets/js/vendor/jquery-slim.min.js"><\/script>')</script>
+  <script src="{% static "js/bootstrap.min.js" %}"></script>
+  <script>
+    function getPlot() {
+
+    }
+  </script>
+</html>

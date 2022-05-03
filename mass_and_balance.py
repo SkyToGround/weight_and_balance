@@ -1,22 +1,21 @@
 from typing import Union, List, Tuple, Optional
 import numpy as np
-import pylab as pl
 from enum import Enum
 import matplotlib.gridspec as gridspec
 from scipy.interpolate import interp1d
 import itertools
 from matplotlib import ticker
+from matplotlib.axis import Axis
+from matplotlib.patches import Circle
 from scipy.spatial import ConvexHull
-from intersects import intersects
-from matplotlib.widgets import Button
+try:
+    from intersects import intersects
+except ImportError:
+    from weight_and_balance.intersects import intersects
 from copy import deepcopy
-from configparser import ConfigParser
-from sys import platform
-import subprocess
-# from descartes import PolygonPatch
-# sys.path.insert(0, os.path.dirname(os.getcwd()))
-# from alphashape import alphashape
-# from alpha_shapes.alpha_shapes import Alpha_Shaper
+from matplotlib.figure import Figure
+import PIL, PIL.Image
+from os.path import exists
 
 inch = 2.54 #cm
 pound = 0.45359 #kg
@@ -95,7 +94,7 @@ class WBLine:
             arm[i] = p.arm
         return mass, arm
 
-    def plot_line(self, ax: pl.axis, label=None):
+    def plot_line(self, ax: Axis, label=None):
         mass_line, arm_line = self.get_wb_line()
         return ax.plot(arm_line, mass_line, label=label)
 
@@ -191,9 +190,9 @@ class Aircraft:
 
     def set_pilot_mass(self, pilot_mass: float):
         if pilot_mass > 110:  # More than 110 kg == two pilots
-            self._pilots = [Load(pilot_mass / 2, self._pilot_arm, lateral_pos=-42), Load(pilot_mass / 2, self._pilot_arm, lateral_pos=42)]
+            self._pilots = [Load(pilot_mass / 2, self._pilot_arm, lateral_pos=-44), Load(pilot_mass / 2, self._pilot_arm, lateral_pos=44)]
             return
-        self._pilots = [Load(pilot_mass, self._pilot_arm, lateral_pos=-42),]
+        self._pilots = [Load(pilot_mass, self._pilot_arm, lateral_pos=-44),]
 
     def set_fuel_mass(self, fuel_mass: Union[float, int, np.ndarray]):
         self._fuel_tank.mass = fuel_mass
@@ -283,6 +282,18 @@ def place_passengers(balance: Balance, seats: List[Seat], passengers: np.ndarray
     return return_list
 
 
+def exit_placement(balance: Balance, seats: List[Seat], passengers: np.ndarray) -> List[Passenger]:
+    seats.sort()
+    seats = seats[::-1]
+    passengers.sort()
+    if balance == Balance.FrontHeavy:
+        passengers = passengers[::-1]
+    return_list: List[Passenger] = []
+    for i, p in enumerate(passengers):
+        return_list.append(Passenger(p, seats[i]))
+    return return_list
+
+
 @ticker.FuncFormatter
 def fuel_formatter(x, pos):
     return f"{x:.0f}"
@@ -313,44 +324,16 @@ def calc_exit_cb_point(plane: Aircraft, seats_balance: Balance, exit_balance: Ba
     passengers_placed = place_passengers(balance=seats_balance, seats=seats, passengers=passengers,
                                            shifts_back=passenger_shift)[0:len(passengers) - nr_passengers_left]
     passengers_placed, exit_group = remove_exit_group(passengers_placed, nr_in_exit_grp)
-    exit_grp_placed = place_passengers(balance=exit_balance, seats=exit_seats, passengers=exit_group,
-                                             shifts_back=0)
+    exit_grp_placed = exit_placement(balance=exit_balance, seats=exit_seats, passengers=exit_group)
     plane.set_fuel_mass(fuel_mass)
     plane.set_passengers(passengers_placed + exit_grp_placed)
     c_wb = plane.get_weight_and_balance()
     return c_wb, plane.within_limits(c_wb)
 
 
-def get_setting(config: ConfigParser, config_name: str, description: str, numeric_type: type, default: Optional[int] = None):
-    config_section = "WeightAndBalance"
-    if config_section not in config:
-        config.add_section(config_section)
-    if config_name not in config[config_section]:
-        config[config_section][config_name] = f"{default}"
-    default = numeric_type(config[config_section][config_name])
-    new_value = ""
-    while True:
-        try:
-            print(f"{description:>30s} ({default:4.0f}):", end='')
-            new_value = input()
-            if new_value == "" and default is not None:
-                break
-            default = numeric_type(new_value)
-        except ValueError as e:
-            print(f"The input \"{new_value}\" can not be converted to a number. The error was: {e}")
-        break
-    config[config_section][config_name] = f"{default}"
-    return default
-
-def get_float_setting(config: ConfigParser, config_name: str, description: str, default: Optional[int] = None):
-    return get_setting(config, config_name, description, float, default)
-
-def get_int_setting(config: ConfigParser, config_name: str, description: str, default: Optional[int] = None):
-    return get_setting(config, config_name, description, int, default)
-
-def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int, jumper_total_weight: float, jumper_min_weight: float, jumper_max_weight: float):
-    right = -42.0
-    left = 42.0
+def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int, jumper_total_weight: float, jumper_min_weight: float, jumper_max_weight: float, fig: Figure, solution_exception: bool=True):
+    right = -44.0
+    left = 44.0
     origin = 422.0
     offset = 44.0
     seats = [Seat(origin + offset * 0, 1, right),
@@ -380,6 +363,18 @@ def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int
         Seat(319.5 * inch, 4, -50),
         Seat(339 * inch, 5, -95.0),
     ]
+    # exit_seats = [
+    #     Seat(163.1023622 * inch, 10, 0),
+    #     Seat(178.4566929 * inch, 9, 0),
+    #     Seat(193.8110236 * inch, 8, 0),
+    #     Seat(209.1653543 * inch, 7, 0),
+    #     Seat(224.519685 * inch, 6, 0),
+    #     Seat(239.8740157 * inch, 5, 0),
+    #     Seat(255.2283465 * inch, 4, 122 - 61),
+    #     Seat(270.5826772 * inch, 3, 122 - 61),
+    #     Seat(278.8503937 * inch, 2, 94 - 61),
+    #     Seat(289.8740157 * inch, 1, 63.0 - 61),
+    # ]
     wb_limits = WBLine(
         [WBPoint(4500 * pound, 179.6 * inch), WBPoint(5500 * pound, 179.6 * inch), WBPoint(8000 * pound, 193.37 * inch),
          WBPoint(8750 * pound, 199.15 * inch), WBPoint(9062 * pound, 200.23 * inch),
@@ -428,40 +423,50 @@ def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int
                 max_n_exit = min(len(exit_seats), len(passengers) - n_has_left)
                 max_has_exited = 0
                 for n_exit in range(1, max_n_exit + 1):
+                    limits_arr = []
+                    c_wb_point_arr = []
                     for seated_balance, exit_balance in itertools.product(balance_alts, balance_alts):
-                        c_wb_point, within_limits = calc_exit_cb_point(plane=lsk, seats_balance=seated_balance,
+                        c_wb_points, within_limits = calc_exit_cb_point(plane=lsk, seats_balance=seated_balance,
                                                                        exit_balance=exit_balance,
                                                                        fuel_mass=fuel_mass_range,
                                                                        seats=seats, exit_seats=exit_seats,
                                                                        passengers=passengers, passenger_shift=s,
                                                                        nr_passengers_left=n_has_left,
                                                                        nr_in_exit_grp=n_exit)
-                        if within_limits:
-                            list_of_wb_points.add_point(c_wb_point)
-                            max_has_exited = n_exit
+                        limits_arr.append(within_limits)
+                        c_wb_point_arr.append(c_wb_points)
+                    if np.array(limits_arr).all():
+                        for wb_list in c_wb_point_arr:
+                            list_of_wb_points.add_point(wb_list)
+                        max_has_exited = n_exit
                 max_exit_group[n_has_left] = max_has_exited
             if max_exit_group.sum() > best_exit_group.sum():
                 best_exit_group = max_exit_group
                 best_seats = passengers_placed
                 best_wb_points = list_of_wb_points
                 best_seated_wb_points = c_seated_wb_points
-            print(f"For shift {s}, max exit groups: {max_exit_group}")
 
             list_of_seats_used.append(passengers_to_used_seats(passengers_placed))
     usable_seats = np.unique(list_of_seats_used)
-    print(f"Usable seats ({len(usable_seats)}): {usable_seats}")
-    if len(usable_seats) == 0:
+    if len(usable_seats) == 0 and solution_exception:
         raise RuntimeError("Unable to find a solution.")
+    elif len(usable_seats) == 0:
+        gs = gridspec.GridSpec(nrows=16, ncols=1)
+        ax = fig.add_subplot(gs[0:7, :])
+        ax.text(0, 0, "No solution found.", size="large", va="center", ha="center")
+        ax.axis([-10, 10, -10, 10])
+        ax.yaxis.set_ticks([])
+        ax.xaxis.set_ticks([])
+        return
 
-    gs = gridspec.GridSpec(nrows=14, ncols=1)
-    fig = pl.figure(figsize=(7, 10))
+    gs = gridspec.GridSpec(nrows=16, ncols=1)
     ax = fig.add_subplot(gs[0:7, :])
     ax.set_ylabel("Mass (kg)")
     ax.set_xlabel("Arm (cm)")
     v_offset = 85
     v_start = 4000
     h_offset = 1
-    h_start = 482
+    h_start = 480
     param_lines = [
         ["Maximum fuel",
          f"{fuel_mass_range.max():.0f} kg / {fuel_mass_range.max() / jeta1_density:.0f} ℓ / {fuel_mass_range.max() / pound:.0f} lbs"],
@@ -488,6 +493,18 @@ def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int
     def lbs_fuel_to_mass(fvol):
         return (fvol * pound) + no_fuel_no_passenger_mass
 
+    def mass_to_lbs(fmass):
+        return fmass / pound
+
+    def lbs_to_mass(fvol):
+        return fvol * pound
+
+    def inch_to_cm(fvol):
+        return fvol * inch
+
+    def cm_to_inch(fvol):
+        return fvol / inch
+
     fuel_axis = ax.secondary_yaxis("left", functions=(mass_to_volume, volume_to_mass))
     fuel_axis.set_ylabel("Fuel (ℓ)")
     fuel_axis.yaxis.set_major_formatter(fuel_formatter)
@@ -503,13 +520,27 @@ def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int
     fuel_lbs_axis.yaxis.set_label_position("right")
     fuel_lbs_axis.yaxis.set_major_formatter(fuel_formatter)
 
+    inch_axis = ax.secondary_xaxis("top", functions=(cm_to_inch, inch_to_cm))
+    inch_axis.set_xlabel("Arm (inch)")
+
+    lbs_axis = ax.secondary_yaxis("right", functions=(mass_to_lbs, lbs_to_mass))
+    # lbs_axis.set_yticks(np.append(np.arange(0, max_pounds, 400), [max_pounds, ]))
+    lbs_axis.set_ylabel("Mass (lbs)")
+    lbs_axis.yaxis.tick_right()
+    lbs_axis.yaxis.set_label_position("right")
+    lbs_axis.yaxis.set_minor_locator(ticker.MultipleLocator(250))
+    # lbs_axis.yaxis.set_major_formatter(fuel_formatter)
+
     plot_lim_mass, plot_lim_arm = wb_limits.get_wb_line()
     ax.plot(plot_lim_arm, plot_lim_mass, "-", color="k")
     arm_landing_limits = np.array([197.22, 204.35]) * inch
     weight_landing_limits = np.array([8500, 8500]) * pound
     ax.plot(arm_landing_limits, weight_landing_limits, "--", color="k")
     ax.axis([440, None, None, None])
-    ax.grid()
+    ax.yaxis.set_minor_locator(ticker.MultipleLocator(100))
+    ax.xaxis.set_minor_locator(ticker.MultipleLocator(5))
+    ax.grid(b=True, which='major', linestyle='-')
+    ax.grid(b=True, which='minor', linestyle='--')
     ax.plot(pilot_wb_point.arm, pilot_wb_point.mass, "X", label="Pilot(s)", c="k")
     fuel_wb_line.plot_line(ax, "Fuel")
     exit_mass, exit_arms = best_wb_points.get_wb_line()
@@ -524,12 +555,7 @@ def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int
     seated_hull = ConvexHull(seated_points)
     ax.fill(seated_points[seated_hull.vertices, 0], seated_points[seated_hull.vertices, 1], label="Seated W&B (TO)",
             c="#1f77b4")
-    # shaper = Alpha_Shaper(seated_points)
-    # alpha_shape = shaper.get_shape(alpha=0.2)
-    # ax.add_patch(PolygonPatch(alpha_shape, color='#1f77b4'))
-
-    # ax.plot(seated_arm, seated_mass, "o", c="k")
-    ax.legend()
+    ax.legend(loc=4)
 
     ax_exits = fig.add_subplot(gs[8:10, :])
     ax_exits.plot(np.arange(len(best_exit_group)), best_exit_group, "X")
@@ -537,17 +563,22 @@ def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int
     ax_exits.set_ylabel("Max exit grp. size")
     ax_exits.grid(True)
 
-    ax_seats = fig.add_subplot(gs[11:13, :])
+    ax_seats = fig.add_subplot(gs[12:14, :])
+    for img_name in ["weight_and_balance/se_lsk.png", "se_lsk.png"]:
+        if exists(img_name):
+            lsk_img = PIL.Image.open(img_name)
+            ax_seats.imshow(lsk_img, aspect="equal", extent=(254.0, 904.0, -93.0, 93.0))
+            break
     for pilot in lsk._pilots:
-        circle = pl.Circle((pilot.arm, pilot.lateral_pos), 15.5, color='k', fill=False)
+        circle = Circle((pilot.arm, pilot.lateral_pos), 15.5, color='k', fill=False)
         ax_seats.add_patch(circle)
-        ax_seats.text(pilot.arm, pilot.lateral_pos, "P", ha="center", va="center")
+        ax_seats.text(pilot.arm, pilot.lateral_pos, "P", ha="center", va="center", size="x-small")
     c_used_seats = passengers_to_used_seats(best_seats)
     for c_seat in seats:
-        circle = pl.Circle((c_seat.arm, c_seat.lateral_pos), 15.5, color='k', fill=False)
+        circle = Circle((c_seat.arm, c_seat.lateral_pos), 15.5, color='k', fill=False)
         ax_seats.add_patch(circle)
         ax_seats.text(c_seat.arm, c_seat.lateral_pos, f"{c_seat.seat_nr}", ha="center",
-                      va="center")
+                      va="center", size="x-small")
         if c_seat.seat_nr not in c_used_seats:
             no_place_lines_1 = np.array([-1, 1]) * 18
             no_place_lines_2 = np.array([1, -1]) * 18
@@ -557,18 +588,19 @@ def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int
                           "-", color="k")
 
     for c_exit in exit_seats:
-        circle = pl.Circle((c_exit.arm, c_exit.lateral_pos), 15.5, color='k', fill=False)
+        circle = Circle((c_exit.arm, c_exit.lateral_pos), 15.5, color='k', fill=False)
         ax_seats.add_patch(circle)
-        ax_seats.text(c_exit.arm, c_exit.lateral_pos, "E", ha="center", va="center")
+        ax_seats.text(c_exit.arm, c_exit.lateral_pos, "E", ha="center", va="center", size="x-small")
     ax_seats.margins(y=0)
     ax_seats.axis([300, 900, None, None])
-    ax_seats.xaxis.set_ticks([])
     ax_seats.yaxis.set_ticks([])
-    ax_seats.xaxis.set_ticklabels([])
+    ax_seats.set_xlabel("Arm (cm)")
     ax_seats.yaxis.set_ticklabels([])
+    ax_seats_inch = ax_seats.secondary_xaxis("top", functions=(cm_to_inch, inch_to_cm))
+    ax_seats_inch.set_xlabel("Arm (inch)")
     ax_seats.set_title("Seats in use and exit positions")
 
-    ax_extra = fig.add_subplot(gs[13:, :])
+    ax_extra = fig.add_subplot(gs[15:, :])
     ax_extra.xaxis.set_ticks([])
     ax_extra.yaxis.set_ticks([])
     ax_extra.xaxis.set_ticklabels([])
@@ -584,46 +616,3 @@ def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int
     ax_exits.xaxis.set_major_formatter(major_formatter)
     ax_exits.yaxis.set_major_locator(ticker.MultipleLocator(1))
     fig.tight_layout()
-    file_name = "w_and_b_selsk.png"
-    fig.savefig(file_name, dpi=300)
-
-    axcut = pl.axes([0.9, 0.0, 0.1, 0.075])
-
-    def on_click(event):
-        if platform == "win32":
-            print("Printing on Windows")
-            subprocess.call(["mspaint", "/pt", file_name])
-        elif platform == "darwin":
-            print("Printing on Mac OS")
-            subprocess.call(["lpr", file_name])
-        else:
-            print("Unknown platform, cant print.")
-
-    bcut = Button(axcut, 'Print', color='red', hovercolor='green')
-    bcut.on_clicked(on_click)
-    pl.show()
-
-def main():
-    config_file_name = "config.ini"
-    config = ConfigParser()
-    config.read(config_file_name)
-    while True:
-        try:
-            pilot_mass = get_float_setting(config, "pilot_mass", "Pilot mass [kg]", 185)
-            max_fuel_mass_liter = get_float_setting(config, "max_fuel", "Max fuel [ℓ]", 1200)
-            max_fuel_mass = max_fuel_mass_liter * jeta1_density
-            jumpers = get_int_setting(config, "nr_of_skydivers", "Nr of skydivers", 13)
-            jumper_total_mass = get_float_setting(config, "jumper_mass", "Skydiver total mass (w. gear) [kg]", jumpers*92)
-            jumper_min_mass = get_float_setting(config, "jumper_min_mass", "Skydiver min. mass (w/o gear) [kg]", 65)
-            jumper_max_mass = get_float_setting(config, "jumper_max_mass", "Skydiver max. mass (w/o gear) [kg]", 112)
-
-            calc_w_and_b(pilot_mass, max_fuel_mass, jumpers, jumper_total_mass, jumper_min_mass, jumper_max_mass)
-            break
-        except RuntimeError:
-            print("Failed to find solution. Try again.")
-    config_out_file = open(config_file_name, "w")
-    config.write(fp=config_out_file)
-
-
-if __name__ == "__main__":
-    main()
