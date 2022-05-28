@@ -359,8 +359,8 @@ def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int
         Seat(265 * inch, 6, -110),
         Seat(294.5 * inch, 1, -100),
         Seat(294.5 * inch, 2, -55),
-        Seat(319.5 * inch, 3, -95),
-        Seat(319.5 * inch, 4, -50),
+        Seat(312.5 * inch, 3, -95),
+        Seat(312.5 * inch, 4, -50),
         Seat(339 * inch, 5, -95.0),
     ]
     # exit_seats = [
