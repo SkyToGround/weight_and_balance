@@ -9,7 +9,7 @@ from matplotlib.axis import Axis
 from matplotlib.patches import Circle
 from scipy.spatial import ConvexHull
 try:
-    from intersects import intersects
+    from intersects import intersects, line_intersection
 except ImportError:
     from weight_and_balance.intersects import intersects
 from copy import deepcopy
