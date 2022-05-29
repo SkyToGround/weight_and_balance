@@ -253,7 +253,8 @@ class Aircraft:
 
 
 def get_passengers(nr_of: int, min_mass: float, max_mass: float, total_mass: float) -> np.ndarray:
-    assert total_mass / max_mass <= nr_of
+    assert min_mass < max_mass, "Min jumper mass must be smaller than max jumper mass."
+    assert total_mass / max_mass <= nr_of, "Max jumper mass is too low given total jumper mass."
     passengers = np.ones(nr_of)*min_mass
     diff_mass = (max_mass - min_mass)
     nr_of_heavy_passengers = int((total_mass - passengers.sum()) // diff_mass)
@@ -384,8 +385,18 @@ def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int
     lsk.set_pilot_mass(pilot_weight)
     no_fuel_no_passenger_mass = lsk.no_fuel_mass
     pilot_wb_point = lsk.get_weight_and_balance()
-    passengers = get_passengers(nr_of=nr_of_skydivers, min_mass=jumper_min_weight + 10, max_mass=jumper_max_weight + 10,
-                                total_mass=jumper_total_weight)
+    try:
+        passengers = get_passengers(nr_of=nr_of_skydivers, min_mass=jumper_min_weight + 10, max_mass=jumper_max_weight + 10, total_mass=jumper_total_weight)
+    except AssertionError as e:
+        if solution_exception:
+            raise
+        gs = gridspec.GridSpec(nrows=16, ncols=1)
+        ax = fig.add_subplot(gs[0:7, :])
+        ax.text(0, 0, e, size="large", va="center", ha="center")
+        ax.axis([-10, 10, -10, 10])
+        ax.yaxis.set_ticks([])
+        ax.xaxis.set_ticks([])
+        return
     placed_passengers = place_passengers(balance=Balance.FrontHeavy, seats=seats, passengers=passengers, shifts_back=0)
     lsk.set_passengers(placed_passengers)
 
