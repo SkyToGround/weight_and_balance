@@ -564,7 +564,7 @@ def calc_w_and_b(pilot_weight: float, max_fuel_mass: float, nr_of_skydivers: int
     ax_exits.grid(True)
 
     ax_seats = fig.add_subplot(gs[12:14, :])
-    for img_name in ["weight_and_balance/se_lsk.png", "se_lsk.png"]:
+    for img_name in ["weight_and_balance/se_lsk.png", "/var/www/ecdc-status/ecdc_status/weight_and_balance/se_lsk.png", "se_lsk.png"]:
         if exists(img_name):
             lsk_img = PIL.Image.open(img_name)
             ax_seats.imshow(lsk_img, aspect="equal", extent=(254.0, 904.0, -93.0, 93.0))
