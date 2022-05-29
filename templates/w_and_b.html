@@ -79,16 +79,40 @@
   <script>window.jQuery || document.write('<script src="../../assets/js/vendor/jquery-slim.min.js"><\/script>')</script>
   <script src="{% static "js/bootstrap.min.js" %}"></script>
   <script>
+    function getAndStore(key) {
+      var input_value = document.getElementById(key).value;
+      localStorage.setItem(key, input_value);
+      return input_value;
+    }
+
     function getPlot() {
       document.getElementById("wb_plot").src="";
-      var skydivers = document.getElementById("skydivers").value;
-      var pilot_weight = document.getElementById("pilot_weight").value;
-      var total_weight = document.getElementById("totalWeight").value;
-      var minWeight = document.getElementById("minWeight").value;
-      var maxWeight = document.getElementById("maxWeight").value;
-      var fuelWeight = parseFloat(document.getElementById("fuel_amount").value) * 0.45359237;
+      var skydivers = getAndStore("skydivers");
+      var pilot_weight = getAndStore("pilot_weight");
+      var total_weight = getAndStore("totalWeight");
+      var minWeight = getAndStore("minWeight");
+      var maxWeight = getAndStore("maxWeight");
+      var fuelWeight = parseFloat(getAndStore("fuel_amount")) * 0.45359237;
       document.getElementById("wb_plot").src=`w_and_b_plot/${skydivers}/${pilot_weight}/${total_weight}/${minWeight}/${maxWeight}/${Math.round(fuelWeight)}/`;
     }
-    document.onload = getPlot();
+
+    function getAndSet(key) {
+      var stored_value = localStorage.getItem(key);
+      if (stored_value != null) {
+        document.getElementById(key).value = stored_value;
+      }
+    }
+
+    function initPlot() {
+      getAndSet("skydivers");
+      getAndSet("pilot_weight");
+      getAndSet("totalWeight");
+      getAndSet("minWeight");
+      getAndSet("maxWeight");
+      getAndSet("fuel_amount");
+      getPlot();
+    }
+
+    document.onload = initPlot();
   </script>
 </html>
