@@ -8,14 +8,11 @@ from matplotlib import ticker
 from matplotlib.axis import Axis
 from matplotlib.patches import Circle
 from scipy.spatial import ConvexHull
-try:
-    from intersects import intersects, line_intersection
-except ImportError:
-    from weight_and_balance.intersects import intersects
 from copy import deepcopy
 from matplotlib.figure import Figure
 import PIL, PIL.Image
 from os.path import exists
+import matplotlib.path as mplPath
 
 inch = 2.54 #cm
 pound = 0.45359 #kg
@@ -178,6 +175,11 @@ class Passenger(Load):
         return f"{self._seat}: {self.mass:0.f}kg"
 
 
+def inside_polygon(point:np.ndarray, corners:np.ndarray):
+    bbPath = mplPath.Path(corners)
+    return bbPath.contains_point(point)
+
+
 class Aircraft:
     def __init__(self, empty_wb: WBPoint, pilot_arm: float, fuel_tank: FuelLoad, limits: WBLine):
         self._empty_mass = empty_wb.mass
@@ -227,13 +229,10 @@ class Aircraft:
             wb = self.get_weight_and_balance()
         if not isinstance(wb, List):
             wb = [wb, ]
-        reference_arm = 510.0
-        reference_weight = 2000.0
         test_mass, test_arm = self._limits.get_wb_line()
         for c_wb in wb:
-            for i in range(len(test_mass) - 1):
-                if intersects(((reference_arm, reference_weight), (c_wb.arm, c_wb.mass)), ((test_arm[i], test_mass[i]), (test_arm[i + 1], test_mass[i + 1]))):
-                    return False
+            if not inside_polygon(np.array((c_wb.arm, c_wb.mass)), np.stack((test_arm, test_mass), axis=1)):
+                return False
         return True
 
     @property
